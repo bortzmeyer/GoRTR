@@ -7,7 +7,7 @@ Background
 ----------
 
 The general architecture of RPKI is described in RFC 6480. The RFC
-about the RTR protocol is not yet published.
+about the RTR protocol is RFC 6810.
 
 Usage
 -----
@@ -56,3 +56,9 @@ Author
 ------
 
 Stephane Bortzmeyer <bortzmeyer@nic.fr>
+
+
+Similar programs
+----------------
+
+RTR library in C <http://rpki.realmv6.org/>

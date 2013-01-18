@@ -1,7 +1,7 @@
 /* This package implements the RTR protocol (Router to RPKI cache
-protocol) specified in RFC NOT-YET-PUBLISHED. It is an implementation
-of the client, and mostly done for surveys or monitoring, not to be
-included in a real router.
+protocol) specified in RFC 6810. It is an implementation of the
+client, and mostly done for surveys or monitoring, not to be included
+in a real router.
 
 Example of use:
         func display(event rtr.Event, state rtr.Client) {
@@ -35,7 +35,7 @@ import (
 
 const (
 	pROTOCOLVERSION = 0
-	// PDU types
+	// PDU types http://www.iana.org/assignments/rpki/rpki.xml#rpki-rtr-pdu
 	sERIALNOTIFY  = 0
 	sERIALQUERY   = 1
 	rESETQUERY    = 2
@@ -72,7 +72,7 @@ type Prefix struct {
 	ASn          uint32
 }
 
-// An interesting even from the cache, typically a new prefix
+// An interesting event from the cache, typically a new prefix
 type Event struct {
 	Description string
 	NewPrefix   *Prefix // nil if if the event is not a new prefix
@@ -175,8 +175,9 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 		case eRRORREPORT:
 			lengthPDU := binary.BigEndian.Uint32(buffer[0:4])
 			lengthText := binary.BigEndian.Uint32(buffer[4+lengthPDU : 8+lengthPDU])
+			errorCode := binary.BigEndian.Uint16(headerbuffer[2:4]) // http://www.iana.org/assignments/rpki/rpki.xml#rpki-rtr-error
 			errorText := string(buffer[8+lengthPDU : 8+lengthPDU+lengthText])
-			comm <- errors.New(fmt.Sprintf("Got an Error Report \"%s\"", errorText))
+			comm <- errors.New(fmt.Sprintf("Got an Error Report #%d \"%s\"", errorCode, errorText))
 			break
 		default:
 			comm <- errors.New(fmt.Sprintf("Unknown PDU type %d\n", pduType)) // TODO: what does the RFC says about that?
