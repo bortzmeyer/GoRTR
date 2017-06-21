@@ -7,7 +7,9 @@ Background
 ----------
 
 The general architecture of RPKI is described in RFC 6480. The RFC
-about the RTR protocol is RFC 6810.
+about the RTR protocol is RFC 6810 (version 0 of the protocol: the RFC
+about version 1 will be out soon, the library currently supports only
+version 0).
 
 Usage
 -----
@@ -15,12 +17,15 @@ Usage
 This library is written in [Go](http://golang.org), so you need a Go compiler 
 installed. 
 
-    go doc rtr/rtr.go
+You can install it simply with:
+go get github.com/bortzmeyer/GoRTR/rtr
 
-to see the usage documentation. Or read the two samples clients,
-text-client.go (displays the prefixes received) or
-database-store-client.go (store the prefixes in a PostgreSQL database
-created with database-store-create.sql)
+To read the documentation, go in the rtr/ directory, then:
+    go doc 
+
+Or read the two samples clients, text-client (displays the prefixes
+received) or database-store-client (store the prefixes in a PostgreSQL
+database created with database-store-create.sql)
 
 Reference site
 --------------
