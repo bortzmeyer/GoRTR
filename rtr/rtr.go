@@ -41,10 +41,10 @@ const (
 	cACHERESPONSE = 3
 	iPv4PREFIX    = 4
 	// 5 not assigned
-	iPv6PREFIX = 6
-	eNDOFDATA  = 7
-	cACHERESET = 8
-	// 9 not assigned
+	iPv6PREFIX  = 6
+	eNDOFDATA   = 7
+	cACHERESET  = 8
+	rOUTERKEY   = 9
 	eRRORREPORT = 10
 	// Sizes
 	hEADERSIZE      = 8
@@ -183,6 +183,12 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			// The cache probably restarted or lost its history. Let's restart from the bgeinning
 			action(Event{"Cache reset", nil}, *client)
 			client.resetQuery()
+		case rOUTERKEY:
+			if protocolVersion <= 0 {
+				comm <- errors.New(fmt.Sprintf("Invalid Router Key message received for protocol version %d", protocolVersion))
+				break
+			}
+			action(Event{"Router Key (ignored)", nil}, *client)
 		case eRRORREPORT:
 			lengthPDU := binary.BigEndian.Uint32(buffer[0:4])
 			lengthText := binary.BigEndian.Uint32(buffer[4+lengthPDU : 8+lengthPDU])
