@@ -8,8 +8,9 @@ Background
 
 The general architecture of RPKI is described in RFC 6480. The RFC
 about the RTR protocol is RFC 6810 (version 0 of the protocol: the RFC
-about version 1 will be out soon, the library currently supports only
-version 0).
+about version 1 will be out soon, the library currently supports both,
+but without negotiation, you have to indicate the version
+explicitely).
 
 Usage
 -----

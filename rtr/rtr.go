@@ -11,7 +11,7 @@ Example of use:
         }
 
         rtrClient := &rtr.Client{}
-	err := rtrClient.Dial("rtr-test.bbn.com:12712", display)
+	err := rtrClient.Dial("rpki-validator.realmv6.org:8282", display, 0)
 	if err != nil {
 		fmt.Printf("Problem with RTR server: %s\n", err)
 		os.Exit(1)
@@ -34,7 +34,6 @@ import (
 )
 
 const (
-	pROTOCOLVERSION = 0
 	// PDU types http://www.iana.org/assignments/rpki/rpki.xml#rpki-rtr-pdu
 	sERIALNOTIFY  = 0
 	sERIALQUERY   = 1
@@ -54,6 +53,10 @@ const (
 	mAXSIZE         = 65536
 	// Misc
 	sLEEPTIME = 40 * time.Minute // The RFC says it must be < 1 hour but some RPKI caches reply with timeout if you don't poll them every five minutes :-(
+)
+
+var (
+	protocolVersion byte
 )
 
 // A connection to the validating RPKI cache (RFC 6480)
@@ -87,7 +90,7 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			comm <- errors.New(fmt.Sprintf("Error in TCP Read of header: %s\n", err))
 			break
 		}
-		if headerbuffer[0] != pROTOCOLVERSION {
+		if headerbuffer[0] != protocolVersion {
 			comm <- errors.New(fmt.Sprintf("Invalid protocol %d\n", headerbuffer[0]))
 			break
 		}
@@ -111,7 +114,7 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			sessionID := binary.BigEndian.Uint16(headerbuffer[2:4])
 			if client.SessionID != nil {
 				if *client.SessionID != sessionID {
-					comm <- errors.New(fmt.Sprintf("Serial Notify received with a wrong session ID (%d, expecting %d)", sessionID, *client.SessionID))
+					comm <- errors.New(fmt.Sprintf("Serial Notify received with a wrong session ID (%d, expecting %d); cache restarted?", sessionID, *client.SessionID))
 					break
 				}
 			} else {
@@ -200,7 +203,7 @@ func (client *Client) serialQuery() (err error) {
 		return errors.New("serialQuery called but no serial number known")
 	}
 	serialquery := make([]byte, sERIALQUERYSIZE)
-	serialquery[0] = pROTOCOLVERSION
+	serialquery[0] = protocolVersion
 	serialquery[1] = sERIALQUERY
 	binary.BigEndian.PutUint16(serialquery[2:4], *client.SessionID)
 	binary.BigEndian.PutUint32(serialquery[4:8], sERIALQUERYSIZE)
@@ -214,7 +217,7 @@ func (client *Client) serialQuery() (err error) {
 
 func (client *Client) resetQuery() (err error) {
 	resetquery := make([]byte, rESETQUERYSIZE)
-	resetquery[0] = pROTOCOLVERSION
+	resetquery[0] = protocolVersion
 	resetquery[1] = rESETQUERY
 	resetquery[2] = 0 // No need to indicate a real Session ID
 	resetquery[3] = 0
@@ -242,9 +245,10 @@ func (client *Client) loop() (err error) {
 // each prefix we receive. This function will never return except in
 // case of error. If you want to continue even when the cache
 // restarts, you have to loop over Dial()
-func (client *Client) Dial(address string, action func(Event, Client)) (err error) {
+func (client *Client) Dial(address string, action func(Event, Client), version int) (err error) {
 	client.SessionID = nil
 	client.SerialNo = nil
+	protocolVersion = byte(version)
 	client.connection, err = net.Dial("tcp", address)
 	if err != nil {
 		return err

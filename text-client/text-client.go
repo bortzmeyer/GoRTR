@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/bortzmeyer/GoRTR/rtr"
 	"flag"
 	"fmt"
+	"github.com/bortzmeyer/GoRTR/rtr"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -36,16 +37,27 @@ func display(event rtr.Event, state rtr.Client) {
 }
 
 func main() {
+	var (
+		err error
+	)
+	version := 1
 	flag.Parse()
-	if flag.NArg() != 2 {
-		fmt.Printf("Usage: rtrclient server port\n")
+	if flag.NArg() != 2 && flag.NArg() != 3 {
+		fmt.Printf("Usage: rtrclient server port [version]\n")
 		os.Exit(1)
 	}
 	server := flag.Arg(0)
 	port := flag.Arg(1)
-	remote := server + ":" + port
+	remote := server + ":" + port /* TODO does it work with IPv6 ? */
+	if flag.NArg() == 3 {
+		version, err = strconv.Atoi(flag.Arg(2))
+		if err != nil {
+			fmt.Printf("RTR version (you typed \"%s\") must be an integer: %s\n", flag.Arg(2), err)
+			os.Exit(1)
+		}
+	}
 	rtrClient := &rtr.Client{}
-	err := rtrClient.Dial(remote, display)
+	err = rtrClient.Dial(remote, display, version)
 	if err != nil {
 		fmt.Printf("%s Problem with RTR server: %s\n", time.Now().Format(time.RFC3339), err)
 		os.Exit(1)

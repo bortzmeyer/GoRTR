@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/bortzmeyer/GoRTR/rtr"
 	"database/sql"
 	"flag"
 	"fmt"
 	_ "github.com/bmizerany/pq"
+	"github.com/bortzmeyer/GoRTR/rtr"
 	"os"
 )
 
@@ -51,7 +51,7 @@ func main() {
 	server := flag.Arg(0)
 	port := flag.Arg(1)
 	remote = server + ":" + port
-	database, err = sql.Open("postgres", "host=/var/run/postgresql dbname=essais sslmode=disable")
+	database, err = sql.Open("postgres", "host=/var/run/postgresql dbname=tests sslmode=disable")
 	if err != nil { // Useless, Open never fails https://github.com/bmizerany/pq/issues/63
 		fmt.Printf("Cannot connnect to PostgreSQL: %s\n", err)
 		os.Exit(1)
@@ -72,7 +72,7 @@ func main() {
 		os.Exit(1)
 	}
 	rtrClient := &rtr.Client{}
-	err = rtrClient.Dial(remote, store)
+	err = rtrClient.Dial(remote, store, 0)
 	if err != nil {
 		fmt.Printf("Problem with RTR server: %s\n", err)
 		os.Exit(1)
