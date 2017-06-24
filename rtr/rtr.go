@@ -139,25 +139,33 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			action(Event{fmt.Sprintf("Cache Response, session is %d", *client.SessionID), nil}, *client)
 		case iPv4PREFIX:
 			flags := (buffer[0] & 0x1)
+			if length != 20 {
+				action(Event{(fmt.Sprintf("IPv4 prefix but with a length != 20: %d bytes (skipped)", length)), nil}, *client)
+				continue
+			}
 			announcement := false
 			if flags == 1 {
 				announcement = true
 			}
-			length := buffer[1]
+			plength := buffer[1]
 			maxlength := buffer[2]
 			asn := binary.BigEndian.Uint32(buffer[8:12])
-			prefix := Prefix{announcement, net.IP(buffer[4:8]), length, maxlength, asn}
+			prefix := Prefix{announcement, net.IP(buffer[4:8]), plength, maxlength, asn}
 			action(Event{"Prefix", &prefix}, *client)
 		case iPv6PREFIX:
 			flags := (buffer[0] & 0x1)
+			if length != 32 {
+				action(Event{(fmt.Sprintf("IPv6 prefix but with a length != 32: %d bytes (skipped)", length)), nil}, *client)
+				continue
+			}
 			announcement := false
 			if flags == 1 {
 				announcement = true
 			}
-			length := buffer[1]
+			plength := buffer[1]
 			maxlength := buffer[2]
 			asn := binary.BigEndian.Uint32(buffer[20:24])
-			prefix := Prefix{announcement, net.IP(buffer[4:20]), length, maxlength, asn}
+			prefix := Prefix{announcement, net.IP(buffer[4:20]), plength, maxlength, asn}
 			action(Event{"Prefix", &prefix}, *client)
 		case eNDOFDATA:
 			// TODO: test the session ID
