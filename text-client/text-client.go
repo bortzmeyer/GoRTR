@@ -32,7 +32,7 @@ func display(event rtr.Event, state rtr.Client) {
 		} else {
 			lengthRange = fmt.Sprintf("%d-%d", event.NewPrefix.Length, event.NewPrefix.MaxLength)
 		}
-		fmt.Printf("%s %s %s/%s from %d (#%s)\n", currentTime, announce, event.NewPrefix.Address, lengthRange, event.NewPrefix.ASn, serial)
+		fmt.Printf("%s %s %s/%s from AS %d (serial #%s)\n", currentTime, announce, event.NewPrefix.Address, lengthRange, event.NewPrefix.ASn, serial)
 	}
 }
 

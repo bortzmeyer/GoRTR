@@ -57,6 +57,7 @@ const (
 
 var (
 	protocolVersion byte
+	debug           bool = false // TODO export it for the clients
 )
 
 // A connection to the validating RPKI cache (RFC 6480)
@@ -81,13 +82,32 @@ type Event struct {
 	NewPrefix   *Prefix // nil if if the event is not a new prefix
 }
 
+func checkLength(comm chan error, ptype byte, length uint, expected uint) (err error) {
+	if length != expected {
+		err := errors.New(fmt.Sprintf("For packet type %d, expected a legth of %d, but got %d\n", ptype, expected, length))
+		comm <- err
+	}
+	return err
+}
+
 func (client *Client) readData(comm chan error, action func(Event, Client)) (err error) {
+	var (
+		buffer []byte
+		total  uint
+		n      int
+	)
 	headerbuffer := make([]byte, hEADERSIZE)
-	buffer := make([]byte, 1)
 	for over := false; !over; {
-		n, err := client.connection.Read(headerbuffer)
-		if err != nil {
-			comm <- errors.New(fmt.Sprintf("Error in TCP Read of header: %s\n", err))
+		for total = 0; total < hEADERSIZE; { // TODO add a timeout, if the TCP session becomes stale?
+			n, err = client.connection.Read(headerbuffer[total:])
+			if err != nil {
+				comm <- errors.New(fmt.Sprintf("Error in TCP Read of RTR header: \"%s\" (got %d bytes)\n", err, n))
+				break
+			}
+			total += uint(n)
+		}
+		if total < hEADERSIZE {
+			comm <- errors.New(fmt.Sprintf("Short in TCP Read of RTR header: got %d bytes, expected %d\n", total, hEADERSIZE))
 			break
 		}
 		if headerbuffer[0] != protocolVersion {
@@ -95,22 +115,31 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			break
 		}
 		pduType := headerbuffer[1]
-		length := int(binary.BigEndian.Uint32(headerbuffer[4:8]))
+		length := uint(binary.BigEndian.Uint32(headerbuffer[4:8]))
 		if length-hEADERSIZE > 0 {
 			buffer = make([]byte, length-hEADERSIZE)
-			// TODO: test the length depending on the PDU type?
-			for total := 0; total < length-hEADERSIZE; {
+			for total = 0; total < length-hEADERSIZE; {
 				n, err = client.connection.Read(buffer[total:])
 				if err != nil {
 					comm <- errors.New(fmt.Sprintf("Error in TCP Read of data: %s\n", err))
 					break
 				}
-				total += n
+				total += uint(n)
 			}
-			// TODO: test we had data, for the PDU which require it
+			if total < length-hEADERSIZE {
+				comm <- errors.New(fmt.Sprintf("Short in TCP Read of data: got %d bytes, expected %d\n", total+hEADERSIZE, length))
+				break
+			}
+		}
+		if debug {
+			fmt.Printf("DEBUG: PDU %d\n", buffer)
 		}
 		switch pduType {
 		case sERIALNOTIFY:
+			err := checkLength(comm, pduType, length, 12)
+			if err != nil {
+				break
+			}
 			sessionID := binary.BigEndian.Uint16(headerbuffer[2:4])
 			if client.SessionID != nil {
 				if *client.SessionID != sessionID {
@@ -129,6 +158,10 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 				client.serialQuery()
 			}
 		case cACHERESPONSE:
+			err := checkLength(comm, pduType, length, 8)
+			if err != nil {
+				break
+			}
 			sessionID := binary.BigEndian.Uint16(headerbuffer[2:4])
 			if client.SessionID != nil {
 				if *client.SessionID != sessionID {
@@ -141,11 +174,11 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			}
 			action(Event{fmt.Sprintf("Cache Response, session is %d", *client.SessionID), nil}, *client)
 		case iPv4PREFIX:
-			flags := (buffer[0] & 0x1)
-			if length != 20 {
-				action(Event{(fmt.Sprintf("IPv4 prefix but with a length != 20: %d bytes (skipped)", length)), nil}, *client)
-				continue
+			err := checkLength(comm, pduType, length, 20)
+			if err != nil {
+				break
 			}
+			flags := (buffer[0] & 0x1)
 			announcement := false
 			if flags == 1 {
 				announcement = true
@@ -156,11 +189,11 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			prefix := Prefix{announcement, net.IP(buffer[4:8]), plength, maxlength, asn}
 			action(Event{"Prefix", &prefix}, *client)
 		case iPv6PREFIX:
-			flags := (buffer[0] & 0x1)
-			if length != 32 {
-				action(Event{(fmt.Sprintf("IPv6 prefix but with a length != 32: %d bytes (skipped)", length)), nil}, *client)
-				continue
+			err := checkLength(comm, pduType, length, 32)
+			if err != nil {
+				break
 			}
+			flags := (buffer[0] & 0x1)
 			announcement := false
 			if flags == 1 {
 				announcement = true
@@ -171,6 +204,10 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			prefix := Prefix{announcement, net.IP(buffer[4:20]), plength, maxlength, asn}
 			action(Event{"Prefix", &prefix}, *client)
 		case eNDOFDATA:
+			err := checkLength(comm, pduType, length, 12)
+			if err != nil {
+				break
+			}
 			// TODO: test the session ID
 			if client.SerialNo == nil {
 				client.SerialNo = new(uint32)
@@ -180,6 +217,10 @@ func (client *Client) readData(comm chan error, action func(Event, Client)) (err
 			action(Event{"(Temporary) End of Data", nil}, *client)
 			// TODO: for the next read, check the session ID ?
 		case cACHERESET:
+			err := checkLength(comm, pduType, length, 8)
+			if err != nil {
+				break
+			}
 			// The cache probably restarted or lost its history. Let's restart from the bgeinning
 			action(Event{"Cache reset", nil}, *client)
 			client.resetQuery()
