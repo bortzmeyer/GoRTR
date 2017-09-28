@@ -1,7 +1,7 @@
 /* This package implements the RTR protocol (Router to RPKI cache
-protocol) specified in RFC 6810. It is an implementation of the
-client, and mostly done for surveys or monitoring, not to be included
-in a real router.
+protocol) specified in RFC 6810 and 8210. It is an implementation of
+the client, and mostly done for surveys or monitoring, not to be
+included in a real router.
 
 Example of use:
         func display(event rtr.Event, state rtr.Client) {
